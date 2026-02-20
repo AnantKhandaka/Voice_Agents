@@ -1,10 +1,17 @@
 import asyncio
 import os
 import re
+import logging
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 import hashlib
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 import aiofiles
 import aiohttp
@@ -73,7 +80,7 @@ class AdvancedDocumentParser:
                     text = await response.text()
                     return AdvancedDocumentParser._clean_html(text)
         except Exception as e:
-            print(f"Error fetching {url}: {e}")
+            logger.error(f"Error fetching {url}: {e}")
             return ""
 
     @staticmethod
@@ -83,7 +90,7 @@ class AdvancedDocumentParser:
             async with aiofiles.open(path, "r", encoding="utf-8") as f:
                 return await f.read()
         except Exception as e:
-            print(f"Error reading {path}: {e}")
+            logger.error(f"Error reading {path}: {e}")
             return ""
 
     @staticmethod
@@ -98,7 +105,7 @@ class AdvancedDocumentParser:
                         text += f"\n[Page {page_num}]\n{page_text}\n"
             return text, "pdf"
         except Exception as e:
-            print(f"Error parsing PDF {path}: {e}")
+            logger.error(f"Error parsing PDF {path}: {e}")
             return "", "pdf"
 
     @staticmethod
@@ -109,7 +116,7 @@ class AdvancedDocumentParser:
             text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
             return text, "docx"
         except Exception as e:
-            print(f"Error parsing DOCX {path}: {e}")
+            logger.error(f"Error parsing DOCX {path}: {e}")
             return "", "docx"
 
     @staticmethod
@@ -243,19 +250,19 @@ class OptimizedRAGIndexer:
                 doc = await AdvancedDocumentParser.parse_document(source)
                 
                 if not doc.content.strip():
-                    print(f"Empty document: {source}")
+                    logger.warning(f"Empty document: {source}")
                     continue
                 
                 cache_path = self._get_cache_path(doc.hash)
                 if cache_path.exists() and doc.hash in self.indexed_docs:
-                    print(f"Using cached: {source}")
+                    logger.info(f"Using cached: {source}")
                     chunk_count = int(cache_path.read_text().strip().split("\n")[0])
                     total_chunks += chunk_count
                     doc_count += 1
                     continue
                 
                 chunks = self.chunker.chunk_text(doc.content, doc_source=source)
-                print(f"  └─ {len(chunks)} chunks from {source}")
+                logger.info(f"  └─ {len(chunks)} chunks from {source}")
                 
                 for chunk_data in chunks:
                     await self.memory.add(
@@ -278,7 +285,7 @@ class OptimizedRAGIndexer:
                 doc_count += 1
 
             except Exception as e:
-                print(f"Error indexing {source}: {e}")
+                logger.error(f"Error indexing {source}: {e}")
 
         return total_chunks, doc_count
 
@@ -353,9 +360,9 @@ REMEMBER: Your output will be displayed to users. Make it clean, professional, a
 async def main() -> None:
     """Main RAG application."""
     
-    print("\n" + "="*70)
-    print("ADVANCED RAG AGENT WITH OLLAMA - OPTIMAL PERFORMANCE")
-    print("="*70 + "\n")
+    logger.info("="*70)
+    logger.info("ADVANCED RAG AGENT WITH OLLAMA - OPTIMAL PERFORMANCE")
+    logger.info("="*70)
     
     DOCUMENT_SOURCES = [
         "Agents/Anant_2.pdf",
@@ -370,10 +377,10 @@ async def main() -> None:
     ]
     
     OLLAMA_MODEL = "llama3.2:1b"  
-    print("System Configuration:")
-    print(f"  Model: {OLLAMA_MODEL}")
-    print(f"  Documents: {len(DOCUMENT_SOURCES)}")
-    print(f"  Questions: {len(TEST_QUESTIONS)}\n")
+    logger.info("System Configuration:")
+    logger.info(f"  Model: {OLLAMA_MODEL}")
+    logger.info(f"  Documents: {len(DOCUMENT_SOURCES)}")
+    logger.info(f"  Questions: {len(TEST_QUESTIONS)}")
     
     available_docs = []
     for src in DOCUMENT_SOURCES:
@@ -381,12 +388,12 @@ async def main() -> None:
             available_docs.append(src)
     
     if not available_docs:
-        print("No documents found. Using demo mode.")
+        logger.warning("No documents found. Using demo mode.")
         available_docs = [
             "https://raw.githubusercontent.com/microsoft/autogen/main/README.md"
         ]
     
-    print("Initializing RAG system...")
+    logger.info("Initializing RAG system...")
     rag_agent, rag_memory = await RAGAgentFactory.create_agent(
         model=OLLAMA_MODEL,
         collection_name="ehr_documents"
@@ -394,28 +401,26 @@ async def main() -> None:
     
     await rag_memory.clear()
     
-    print(f"\nIndexing {len(available_docs)} document(s)...")
+    logger.info(f"Indexing {len(available_docs)} document(s)...")
     indexer = OptimizedRAGIndexer(memory=rag_memory, chunk_size=800) 
     total_chunks, doc_count = await indexer.index_documents(available_docs)
     
-    print(f"\nIndexing complete!")
-    print(f"  Documents processed: {doc_count}")
-    print(f"  Total chunks: {total_chunks}")
-    print(f"  Retrieval: top-20 chunks with similarity threshold 0.15")
-    print(f"  Model: {OLLAMA_MODEL} (better for RAG than qwen2.5:3b)\n")
+    logger.info("Indexing complete!")
+    logger.info(f"  Documents processed: {doc_count}")
+    logger.info(f"  Total chunks: {total_chunks}")
+    logger.info(f"  Retrieval: top-20 chunks with similarity threshold 0.15")
+    logger.info(f"  Model: {OLLAMA_MODEL} (better for RAG than qwen2.5:3b)")
     
     
     for i, question in enumerate(TEST_QUESTIONS, 1):
-        print(f"\nQuestion {i}/{len(TEST_QUESTIONS)}: {question}")
-        print("-"*70)
+        logger.info(f"Question {i}/{len(TEST_QUESTIONS)}: {question}")
+        logger.info("-"*70)
         
         try:
             stream = rag_agent.run_stream(task=question)
             await Console(stream)
         except Exception as e:
-            print(f"Error: {e}")
-        
-        print()
+            logger.error(f"Error: {e}")
     
     # Cleanup
     await rag_memory.close()
@@ -425,6 +430,6 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n\nRAG Agent interrupted by user")
+        logger.info("RAG Agent interrupted by user")
     except Exception as e:
-        print(f"\n\nFatal error: {e}")
+        logger.error(f"Fatal error: {e}")

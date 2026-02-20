@@ -18,9 +18,16 @@ import struct
 import math
 import io
 import wave
+import logging
 import httpx
 import pyaudio
 from dotenv import load_dotenv
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 RATE = 16000
@@ -87,7 +94,7 @@ class AudioRecorder(threading.Thread):
                     buffer.clear()
 
                 if time.time() - self.last_sound_time >= SILENCE_TIMEOUT:
-                    print("\n⏹️  30 seconds of silence detected, stopping...")
+                    logger.info("⏹️  30 seconds of silence detected, stopping...")
                     self.stop_event.set()
                     break
 
@@ -125,17 +132,17 @@ async def transcribe_chunk(audio_bytes: bytes, chunk_num: int) -> str:
         transcript = result["results"]["channels"][0]["alternatives"][0]["transcript"].strip()
         
         if transcript:
-            print(f"  ✅ Transcribed: '{transcript[:60]}...'" if len(transcript) > 60 else f"  ✅ Transcribed: '{transcript}'")
+            logger.info(f"  ✅ Transcribed: '{transcript[:60]}...'" if len(transcript) > 60 else f"  ✅ Transcribed: '{transcript}'")
             return transcript
         else:
-            print(f"  ⚠️  No speech in chunk {chunk_num}")
+            logger.warning(f"  ⚠️  No speech in chunk {chunk_num}")
             return ""
             
     except httpx.HTTPStatusError as e:
-        print(f"  ❌ HTTP error transcribing chunk {chunk_num}: {e.response.status_code}")
+        logger.error(f"  ❌ HTTP error transcribing chunk {chunk_num}: {e.response.status_code}")
         return ""
     except Exception as e:
-        print(f"  ❌ Error transcribing chunk {chunk_num}: {e}")
+        logger.error(f"  ❌ Error transcribing chunk {chunk_num}: {e}")
         return ""
 
 
@@ -169,16 +176,16 @@ def listen() -> str:
                 break
 
             chunk_num += 1
-            print(f"🔄 Processing chunk {chunk_num}... (recording continues)")
+            logger.info(f"🔄 Processing chunk {chunk_num}... (recording continues)")
             
             
             text = await transcribe_chunk(chunk, chunk_num)
             
             if text:
-                print(f"✅ Chunk {chunk_num}: {text[:50]}..." if len(text) > 50 else f"✅ Chunk {chunk_num}: {text}")
+                logger.info(f"✅ Chunk {chunk_num}: {text[:50]}..." if len(text) > 50 else f"✅ Chunk {chunk_num}: {text}")
                 full_transcript.append(text)
             else:
-                print(f"⚠️  Chunk {chunk_num}: No speech detected")
+                logger.warning(f"⚠️  Chunk {chunk_num}: No speech detected")
 
     asyncio.run(runner())
     recorder.join()
@@ -214,16 +221,16 @@ async def listen_async() -> str:
             break
 
         chunk_num += 1
-        print(f"🔄 Processing chunk {chunk_num}... (recording continues)")
+        logger.info(f"🔄 Processing chunk {chunk_num}... (recording continues)")
         
         
         text = await transcribe_chunk(chunk, chunk_num)
         
         if text:
-            print(f"✅ Chunk {chunk_num}: {text[:50]}..." if len(text) > 50 else f"✅ Chunk {chunk_num}: {text}")
+            logger.info(f"✅ Chunk {chunk_num}: {text[:50]}..." if len(text) > 50 else f"✅ Chunk {chunk_num}: {text}")
             full_transcript.append(text)
         else:
-            print(f"⚠️  Chunk {chunk_num}: No speech detected")
+            logger.warning(f"⚠️  Chunk {chunk_num}: No speech detected")
 
     recorder.join()
 
@@ -231,17 +238,17 @@ async def listen_async() -> str:
 
 
 if __name__ == "__main__":
-    print("🎤 Voice Recording Started")
-    print("📦 Recording in 10-second chunks")
-    print("⏸️  Auto-stops after 30 seconds of silence")
-    print("🔄 Transcription happens in parallel with recording")
-    print("─" * 50)
+    logger.info("🎤 Voice Recording Started")
+    logger.info("📦 Recording in 10-second chunks")
+    logger.info("⏸️  Auto-stops after 30 seconds of silence")
+    logger.info("🔄 Transcription happens in parallel with recording")
+    logger.info("─" * 50)
 
     result = listen()
 
-    print("\n" + "─" * 50)
+    logger.info("─" * 50)
     if result:
-        print("📝 FINAL TRANSCRIPTION:")
-        print(result)
+        logger.info("📝 FINAL TRANSCRIPTION:")
+        logger.info(result)
     else:
-        print("⚠️  No speech detected")
+        logger.warning("⚠️  No speech detected")

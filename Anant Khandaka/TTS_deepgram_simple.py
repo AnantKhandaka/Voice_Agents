@@ -75,10 +75,10 @@ def main():
     success = text_to_speech(TTS_TEXT, AUDIO_FILE)
     
     if success:
-        print(f"\n✅ SUCCESS! Audio file created: {AUDIO_FILE}")
-        print(f"📝 Text: {TTS_TEXT}")
+        logger.info(f"✅ SUCCESS! Audio file created: {AUDIO_FILE}")
+        logger.info(f"📝 Text: {TTS_TEXT}")
     else:
-        print("\n❌ FAILED to create audio file")
+        logger.error("❌ FAILED to create audio file")
 
 if __name__ == "__main__":
     main()

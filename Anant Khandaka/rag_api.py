@@ -2,6 +2,7 @@ import asyncio
 import os
 import tempfile
 import uuid
+import logging
 from pathlib import Path
 from typing import Optional, List
 from dataclasses import dataclass
@@ -12,6 +13,12 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 from autogen_agentchat.agents import AssistantAgent
 from autogen_core.memory import Memory, MemoryContent, MemoryMimeType
@@ -142,14 +149,14 @@ async def create_session(model: str = "llama3.2:1b"):
     session_id = str(uuid.uuid4())
     
     try:
-        print(f"[DEBUG] Creating session {session_id} with model {model}")
+        logger.info(f"Creating session {session_id} with model {model}")
         
         agent, memory = await RAGAgentFactory.create_agent(
             model=model,
             collection_name=f"rag_{session_id[:8]}"
         )
         
-        print(f"[DEBUG] Agent and memory created successfully")
+        logger.info("Agent and memory created successfully")
         
         await memory.clear()
         
@@ -163,7 +170,7 @@ async def create_session(model: str = "llama3.2:1b"):
             model=model
         )
         
-        print(f"[DEBUG] Session {session_id} stored successfully")
+        logger.info(f"Session {session_id} stored successfully")
         
         return {
             "session_id": session_id,
@@ -174,7 +181,7 @@ async def create_session(model: str = "llama3.2:1b"):
     except Exception as e:
         import traceback
         error_details = f"{str(e)}\n{traceback.format_exc()}"
-        print(f"[ERROR] Session creation failed: {error_details}")
+        logger.error(f"Session creation failed: {error_details}")
         raise HTTPException(status_code=500, detail=f"Session creation failed: {str(e)}")
 
 
@@ -254,9 +261,9 @@ async def ask_question(request: QuestionRequest):
         )
     
     try:
-        print(f"[DEBUG] Starting question: {request.question}")
-        print(f"[DEBUG] Session documents: {session.documents}")
-        print(f"[DEBUG] Session chunks: {session.total_chunks}")
+        logger.info(f"Starting question: {request.question}")
+        logger.debug(f"Session documents: {session.documents}")
+        logger.debug(f"Session chunks: {session.total_chunks}")
         
         answer_text = ""
         
@@ -274,7 +281,7 @@ async def ask_question(request: QuestionRequest):
             elif isinstance(message, str) and '[MemoryContent(' not in message:
                 answer_text += message
         
-        print(f"[DEBUG] Got answer: {answer_text[:100]}...")
+        logger.debug(f"Got answer: {answer_text[:100]}...")
         
         answer_text = answer_text.strip()
         if "[MemoryContent(" in answer_text:
@@ -296,7 +303,7 @@ async def ask_question(request: QuestionRequest):
         
         if "[MemoryContent(" in clean_answer:
             clean_answer = "[No valid answer - internal error]"
-            print("[WARNING] MemoryContent slipped through to final answer!")
+            logger.warning("MemoryContent slipped through to final answer!")
         
         useless_phrases = [
             "I'm not able to provide",
@@ -342,7 +349,7 @@ Provide a clear, direct answer without apologies or explanations. Just the facts
     except Exception as e:
         import traceback
         error_msg = f"{str(e)}\n{traceback.format_exc()}"
-        print(f"[ERROR] Question failed: {error_msg}")
+        logger.error(f"Question failed: {error_msg}")
         raise HTTPException(status_code=500, detail=f"Failed to answer question: {str(e)}")
 
 
@@ -430,7 +437,7 @@ async def ask_batch(session_id: str, questions: List[str]):
     
     for question in questions:
         try:
-            print(f"[DEBUG] Processing question: {question}")
+            logger.info(f"Processing question: {question}")
             answer_text = ""
             stream = session.agent.run_stream(task=question)
             
@@ -463,7 +470,7 @@ async def ask_batch(session_id: str, questions: List[str]):
 
             if "[MemoryContent(" in clean_answer:
                 clean_answer = "[No valid answer - internal error]"
-                print(f"[WARNING] MemoryContent slipped through for question: {question}")
+                logger.warning(f"MemoryContent slipped through for question: {question}")
             
             results.append({
                 "question": question,
@@ -472,7 +479,7 @@ async def ask_batch(session_id: str, questions: List[str]):
             })
         except Exception as e:
             import traceback
-            print(f"[ERROR] Question '{question}' failed: {str(e)}\n{traceback.format_exc()}")
+            logger.error(f"Question '{question}' failed: {str(e)}\n{traceback.format_exc()}")
             results.append({
                 "question": question,
                 "answer": None,
@@ -505,7 +512,7 @@ async def shutdown_event():
             
             del sessions[session_id]
         except Exception as e:
-            print(f"Error cleaning up session {session_id}: {e}")
+            logger.error(f"Error cleaning up session {session_id}: {e}")
 
 
 if __name__ == "__main__":

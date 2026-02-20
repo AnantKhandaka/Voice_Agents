@@ -6,8 +6,15 @@ This allows voice_assistant to use email summarization as a tool
 import asyncio
 import sys
 import io
+import logging
 from contextlib import redirect_stdout
 from agent_email import fetch_latest_10_emails, summarize
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 async def get_email_summaries_async() -> str:
@@ -56,6 +63,6 @@ def get_email_summaries() -> str:
 
 
 if __name__ == "__main__":
-    print("Testing email summary wrapper...")
+    logger.info("Testing email summary wrapper...")
     result = get_email_summaries()
-    print(result)
+    logger.info(result)

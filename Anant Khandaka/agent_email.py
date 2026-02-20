@@ -26,7 +26,7 @@ try:
     PYGAME_AVAILABLE = True
 except ImportError:
     PYGAME_AVAILABLE = False
-    print("⚠️ pygame not installed. Install with: pip install pygame")
+    logging.warning("⚠️ pygame not installed. Install with: pip install pygame")
 
 load_dotenv()
 
@@ -75,7 +75,7 @@ async def summarize(emails: list[str]) -> str:
     Returns:
         str: The summary text
     """
-    print("🤖 Generating AI summaries...\n")
+    logging.info("🤖 Generating AI summaries...")
     
     model_client = OllamaChatCompletionClient(
         model="qwen2.5:3b",
@@ -114,15 +114,15 @@ async def summarize(emails: list[str]) -> str:
     return summary_text
 
 async def main():
-    print("\n📧 Fetching latest 10 emails...\n")
+    logging.info("📧 Fetching latest 10 emails...")
     emails = fetch_latest_10_emails()
     
-    print(f"✅ Retrieved {len(emails)} emails")
+    logging.info(f"✅ Retrieved {len(emails)} emails")
     
     
     summary_text = await summarize(emails)
     
-    print("\n🔊 Converting summaries to speech...\n")
+    logging.info("🔊 Converting summaries to speech...")
     
     if len(summary_text) > 1900:
         summary_text = summary_text[:1900] + "..."
@@ -131,13 +131,13 @@ async def main():
     success = text_to_speech(summary_text, audio_file)
     
     if not success:
-        print("❌ Failed to generate speech.")
+        logging.error("❌ Failed to generate speech.")
         return
     
     abs_path = os.path.abspath(audio_file)
-    print(f"✅ Audio saved: {abs_path}")
+    logging.info(f"✅ Audio saved: {abs_path}")
     
-    print("\n🎵 Playing audio...\n")
+    logging.info("🎵 Playing audio...")
     
     if PYGAME_AVAILABLE:
         try:
@@ -145,41 +145,41 @@ async def main():
             pygame.mixer.music.load(abs_path)
             pygame.mixer.music.play()
             
-            print("▶️ Audio is playing...")
+            logging.info("▶️ Audio is playing...")
             
             while pygame.mixer.music.get_busy():
                 time.sleep(0.1)
             
             pygame.mixer.quit()
-            print("✅ Audio playback completed!")
+            logging.info("✅ Audio playback completed!")
             
         except Exception as e:
-            print(f"❌ pygame error: {e}")
-            print("⚠️ Trying alternative playback method...")
+            logging.error(f"❌ pygame error: {e}")
+            logging.warning("⚠️ Trying alternative playback method...")
             
             if platform.system() == "Windows":
                 try:
                     import winsound
                     winsound.PlaySound(abs_path, winsound.SND_FILENAME)
-                    print("✅ Audio played using winsound")
+                    logging.info("✅ Audio played using winsound")
                 except Exception as e2:
-                    print(f"❌ winsound error: {e2}")
-                    print(f"⚠️ Could not auto-play audio. Please play manually: {abs_path}")
+                    logging.error(f"❌ winsound error: {e2}")
+                    logging.warning(f"⚠️ Could not auto-play audio. Please play manually: {abs_path}")
     else:
-        print("⚠️ pygame not available. Attempting alternative playback...")
+        logging.warning("⚠️ pygame not available. Attempting alternative playback...")
         
         if platform.system() == "Windows":
             try:
                 import winsound
                 winsound.PlaySound(abs_path, winsound.SND_FILENAME)
-                print("✅ Audio played using winsound")
+                logging.info("✅ Audio played using winsound")
             except Exception as e:
-                print(f"❌ Error: {e}")
-                print(f"⚠️ Could not auto-play audio. Please play manually: {abs_path}")
+                logging.error(f"❌ Error: {e}")
+                logging.warning(f"⚠️ Could not auto-play audio. Please play manually: {abs_path}")
     
-    print("\n" + "=" * 60)
-    print("✅ Email summaries complete!")
-    print("=" * 60)
+    logging.info("=" * 60)
+    logging.info("✅ Email summaries complete!")
+    logging.info("=" * 60)
 
 if __name__ == "__main__":
     asyncio.run(main())
